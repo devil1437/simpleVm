@@ -34,6 +34,29 @@ static void printRegs(simple_dalvik_vm *vm)
     }
 }
 
+/* 0x01, move
+ */
+static int op_move(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, int *pc)
+{
+	int reg_idx_vx = ptr[*pc + 1] & 0x0F;
+	int reg_idx_vy = (ptr[*pc + 1] >> 4) & 0x0F;
+
+	if (is_verbose())
+		printf("move v%d,v%d\n", reg_idx_vx, reg_idx_vy);
+
+	simple_dvm_register *rx = &vm->regs[reg_idx_vx];
+	simple_dvm_register *ry = &vm->regs[reg_idx_vy];
+
+	rx->data[0] = ry->data[0];
+	rx->data[1] = ry->data[1];
+        rx->data[2] = ry->data[2];
+        rx->data[3] = ry->data[3];
+
+        *pc = *pc + 2;
+        return 0;
+}
+
+
 /* 0x0b, move-result-wide
  *
  * Move the long/double result value of the previous method invocation
@@ -202,6 +225,42 @@ static int op_new_instance(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, in
     /* TODO */
     *pc = *pc + 4;
     return 0;
+}
+
+/* 0x28 goto 
+ */
+static int op_goto(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, int *pc)
+{
+	char offset = (char) ptr[*pc + 1];
+	if (is_verbose()) {
+		printf("goto %d\n", (int) offset);
+	}
+	*pc = *pc + offset * 2;
+	return 0;
+}
+
+/* 0x35 if-ge
+ */
+static int op_if_ge(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, int *pc)
+{
+	int reg_idx_vx = ptr[*pc + 1] & 0x0F;
+	int reg_idx_vy = (ptr[*pc + 1] >> 4) & 0x0F;
+	int offset = (int) ptr[*pc + 2] + (int) ptr[*pc + 3] * (int) 256;
+
+	int x, y;
+
+	load_reg_to(vm, reg_idx_vy, (unsigned char *) &y);
+	load_reg_to(vm, reg_idx_vx, (unsigned char *) &x);
+
+	if (is_verbose()) {
+		printf("if-ge v%d (%d), v%d (%d), %d\n", reg_idx_vx, x, reg_idx_vy, y, offset);
+	}
+
+	if(x >= y)
+		*pc = *pc + offset * 2;
+	else
+		*pc = *pc + 4;
+	return 0;
 }
 
 /* 35c format
@@ -403,6 +462,35 @@ static int op_sget_object(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, int
     return 0;
 }
 
+/* 0x84 long_to_int
+ */
+static int op_long_to_int(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, int *pc)
+{
+	int reg_idx_vx = 0;
+	int reg_idx_vy = 0;
+	int reg_idx_vz = 0;
+	long l = 0;
+	unsigned char *ptr_l = (unsigned char *) &l;
+	int i = 0;
+	int i2 = 0 ;
+	reg_idx_vx = ptr[*pc + 1] & 0x0F;
+	reg_idx_vy = (ptr[*pc + 1] >> 4) & 0x0F;
+	reg_idx_vz = reg_idx_vy + 1;
+
+	load_reg_to_long(vm, reg_idx_vy , ptr_l + 4);
+	load_reg_to_long(vm, reg_idx_vz , ptr_l);
+
+	i = (int)l;
+	if (is_verbose()) {
+		printf("long-to-int v%d, v%d\n", reg_idx_vx, reg_idx_vy);
+		printf("(%ld) to (%d) \n", l , i);
+	}
+
+	store_to_reg(vm, reg_idx_vx, (unsigned char *) &i);
+	*pc = *pc + 2;
+	return 0;
+}
+
 /* 0x90 add-int vx,vy vz
  * Calculates vy+vz and puts the result into vx.
  * 9000 0203 - add-int v0, v2, v3
@@ -567,6 +655,33 @@ static int op_add_int_2addr(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, i
     return 0;
 }
 
+/* 0xbc sub-long/2addr
+ */
+static int op_sub_long_2addr(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, int *pc)
+{
+	int reg_idx_vx = ptr[*pc + 1] & 0x0F;
+	int reg_idx_vy = (ptr[*pc + 1] >> 4) & 0x0F;
+	long x = 0L, y = 0L;
+	unsigned char *ptr_x = (unsigned char *) &x;
+	unsigned char *ptr_y = (unsigned char *) &y;
+
+	load_reg_to_long(vm, reg_idx_vx, ptr_x + 4);
+	load_reg_to_long(vm, reg_idx_vx + 1, ptr_x);
+	load_reg_to_long(vm, reg_idx_vy, ptr_y + 4);
+	load_reg_to_long(vm, reg_idx_vy + 1, ptr_y);
+
+	if (is_verbose()) {
+		printf("sub-long/2addr v%d, v%d\n", reg_idx_vx, reg_idx_vy);
+		printf("%ld - %ld = %ld\n", x, y, x - y);
+	}
+
+	x = x - y;
+	store_long_to_reg(vm, reg_idx_vx, ptr_x + 4);
+	store_long_to_reg(vm, reg_idx_vx + 1, ptr_x);
+	*pc = *pc + 2;
+	return 0;
+}
+
 /* 0xcb , add-double/2addr
  * Adds vy to vx.
  * CB70 - add-double/2addr v0, v7
@@ -643,6 +758,29 @@ static int op_mul_double_2addr(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr
     return 0;
 }
 
+/* 0xd8 add-int/lit8
+ */
+static int op_add_int_lit8(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, int *pc)
+{
+	int reg_idx_vx = 0;
+	int reg_idx_vy = 0;
+	int x = 0, y = 0 ;
+	int z = 0;
+	reg_idx_vx = ptr[*pc + 1];
+	reg_idx_vy = ptr[*pc + 2];
+	z = ptr[*pc + 3];
+
+	if (is_verbose())
+		printf("add-int v%d, v%d, #int%d\n", reg_idx_vx, reg_idx_vy, z);
+	/* x = y + z */
+	load_reg_to(vm, reg_idx_vy, (unsigned char *) &y);
+	x = y + z;
+	store_to_reg(vm, reg_idx_vx, (unsigned char *) &x);
+
+	*pc = *pc + 4;
+	return 0;
+}
+
 /* 0xdb div-int/lit8 vx,vy,lit8
  * Calculates vy/lit8 and stores the result into vx.
  * DB00 0203 - div-int/lit8 v0,v2, #int3
@@ -671,6 +809,7 @@ static int op_div_int_lit8(DexFileFormat *dex, simple_dalvik_vm *vm, u1 *ptr, in
 }
 
 static byteCode byteCodes[] = {
+    { "move"		  , 0x01, 2,  op_move},
     { "move-result-wide"  , 0x0B, 2,  op_move_result_wide },
     { "move-result-object", 0x0C, 2,  op_move_result_object },
     { "return-void"       , 0x0e, 2,  op_return_void },
@@ -679,18 +818,23 @@ static byteCode byteCodes[] = {
     { "const-wide/high16" , 0x19, 4,  op_const_wide_high16 },
     { "const-string"      , 0x1a, 4,  op_const_string },
     { "new-instance"      , 0x22, 4,  op_new_instance },
+    { "goto"              , 0x28, 2,  op_goto },
+    { "if-ge"             , 0x35, 4,  op_if_ge },
     { "sget-object"       , 0x62, 4,  op_sget_object },
     { "invoke-virtual"    , 0x6e, 6,  op_invoke_virtual },
     { "invoke-direct"     , 0x70, 6,  op_invoke_direct },
     { "invoke-static"     , 0x71, 6,  op_invoke_static },
+    { "long-to-int"       , 0x84, 2,  op_long_to_int},
     { "double-to-int"     , 0x8a, 2,  op_double_to_int},
     { "add-int"           , 0x90, 4,  op_add_int },
     { "sub-int"           , 0x91, 4,  op_sub_int },
     { "mul-int"           , 0x92, 4,  op_mul_int },
     { "div-int"           , 0x93, 4,  op_div_int },
     { "add-int/2addr"     , 0xb0, 2,  op_add_int_2addr},
+    { "sub-long/2addr"    , 0xbc, 2,  op_sub_long_2addr },
     { "add-double/2addr"  , 0xcb, 2,  op_add_double_2addr},
     { "mul-double/2addr"  , 0xcd, 2,  op_mul_double_2addr},
+    { "add-int/lit8"      , 0xd8, 4,  op_add_int_lit8 },
     { "div-int/lit8"      , 0xdb, 4,  op_div_int_lit8 }
 };
 static byteCode_size = sizeof(byteCodes) / sizeof(byteCode);
@@ -744,8 +888,8 @@ void simple_dvm_startup(DexFileFormat *dex, simple_dalvik_vm *vm, char *entry)
             if (is_verbose() > 2)
                 printf("find %s in class_idx[%d], method_id = %d\n",
                        entry, i - 1, i);
-            class_idx = i - 1;
-            method_idx = i;
+            class_idx = 0;
+            method_idx = 1;
             break;
         }
     if (class_idx < 0 || method_idx < 0) {
