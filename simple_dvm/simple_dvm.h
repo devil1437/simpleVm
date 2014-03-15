@@ -220,10 +220,12 @@ typedef struct _simple_dalvik_vm {
 void load_reg_to(simple_dalvik_vm *vm, int id, unsigned char *ptr);
 void load_reg_to_double(simple_dalvik_vm *vm, int id, unsigned char *ptr);
 void load_result_to_double(simple_dalvik_vm *vm, unsigned char *ptr);
+void load_reg_to_long(simple_dalvik_vm *vm, int id, unsigned char *ptr);
 
 void store_to_reg(simple_dalvik_vm *vm, int id, unsigned char *ptr);
 void store_double_to_reg(simple_dalvik_vm *vm, int id, unsigned char *ptr);
 void store_double_to_result(simple_dalvik_vm *vm, unsigned char *ptr);
+void store_long_to_reg(simple_dalvik_vm *vm, int id, unsigned char *ptr);
 
 void move_top_half_result_to_reg(simple_dalvik_vm *vm, int id);
 void move_bottom_half_result_to_reg(simple_dalvik_vm *vm, int id);

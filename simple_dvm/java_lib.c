@@ -111,8 +111,8 @@ static java_lang_method method_table[] = {
     {"Ljava/io/PrintStream;",     "println",  java_io_print_stream_println},
     {"Ljava/lang/StringBuilder;", "<init>",   java_lang_string_builder_init},
     {"Ljava/lang/StringBuilder;", "append",   java_lang_string_builder_append},
-    {"Ljava/lang/StringBuilder;", "toString", java_lang_string_builder_to_string}
-    {"Ljava/lang/System;",        "currentTimeMillis",      java_lang_system_currenttimemillis},
+    {"Ljava/lang/StringBuilder;", "toString", java_lang_string_builder_to_string},
+    {"Ljava/lang/System;",        "currentTimeMillis",      java_lang_system_currenttimemillis}
 };
 
 static int java_lang_method_size = sizeof(method_table) / sizeof(java_lang_method);

@@ -12,6 +12,7 @@ simple_dvm/dvm
 # tests
 output-jvm
 output-dvm
+/tests
 
 # gcov output
 *.gcda
