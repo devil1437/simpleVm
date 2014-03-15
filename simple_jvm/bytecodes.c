@@ -8,6 +8,8 @@
 #include "simple_jvm.h"
 #include "java_lib.h"
 
+static void printCodeAttribute(CodeAttribute *ca, SimpleConstantPool *p);
+
 extern SimpleInterfacePool simpleInterfacePool;
 extern SimpleFieldPool simpleFieldPool;
 extern SimpleConstantPool simpleConstantPool;
@@ -649,6 +651,119 @@ static int op_return(unsigned char **opCode, StackFrame *stack, SimpleConstantPo
     return -1;
 }
 
+static int op_if_icmpge(unsigned char **opCode, StackFrame *stack, \
+		SimpleConstantPool *p)
+{
+	unsigned char branchbyte1 = opCode[0][1];
+	unsigned char branchbyte2 = opCode[0][2];
+
+	int value2 = popInt(stack);
+	int value1 = popInt(stack);
+
+	short target;
+	memcpy((unsigned char *)&target, &branchbyte2, 1);
+	memcpy((unsigned char *)&target + 1, &branchbyte1, 1);
+
+#if SIMPLE_JVM_DEBUG
+	printf("if %d >= %d then goto %d (%d, %d)\n", value1, value2, \
+			(int) target, (int) branchbyte1, (int) branchbyte2);
+#endif
+
+	if(value1 >= value2)
+		*opCode = *opCode + target;
+	else
+		*opCode = *opCode + 3;
+	return 0;
+}
+
+static int op_goto(unsigned char **opCode, StackFrame *stack, \
+		SimpleConstantPool *p)
+{
+	unsigned char branchbyte1 = opCode[0][1];
+	unsigned char branchbyte2 = opCode[0][2];
+
+	short target;
+	memcpy((unsigned char *)&target, &branchbyte2, 1);
+	memcpy((unsigned char *)&target + 1, &branchbyte1, 1);
+
+#if SIMPLE_JVM_DEBUG
+	printf("goto %d (%d, %d)\n", (int) target, (int) branchbyte1, \
+			(int) branchbyte2);
+#endif
+
+	*opCode = *opCode + target;
+	return 0;
+}
+
+static int op_iinc(unsigned char **opCode, StackFrame *stack, \
+		SimpleConstantPool *p)
+{
+	int index = opCode[0][1];
+	char constant = opCode[0][2];
+#if SIMPLE_JVM_DEBUG
+	printf("iinc: increase local variable %d(%d) by %d\n", index, \
+			localVariables.integer[index], constant);
+#endif
+	localVariables.integer[index] = localVariables.integer[index] + constant;
+	*opCode = *opCode + 3;
+	return 0;
+}
+
+static int op_lload(unsigned char **opCode, StackFrame *stack, \
+		SimpleConstantPool *p)
+{
+	int index = opCode[0][1];
+	int value = localVariables.long_int[index];
+#if SIMPLE_JVM_DEBUG
+	printf("lload: load value from local variable %d(%ld)\n", index, \
+			localVariables.long_int[index]);
+#endif
+	pushLong(stack, value);
+	*opCode = *opCode + 2;
+	return 0;
+}
+
+static int op_l2i(unsigned char **opCode, StackFrame *stack, SimpleConstantPool *p)
+{
+	long value1 = popLong(stack);
+	int result = 0;
+	result = (int)value1;
+#if SIMPLE_JVM_DEBUG
+	printf("l2i: %d <-- %ld\n", result, value1);
+#endif
+	pushLong(stack, result);
+	*opCode = *opCode + 1;
+	return 0;
+}
+
+static int op_lstore(unsigned char **opCode, StackFrame *stack, \
+		SimpleConstantPool *p)
+{
+	long value = popLong(stack);
+	int index = opCode[0][1];
+#if SIMPLE_JVM_DEBUG
+	printf("lstore: store value into local variable %d(%ld)\n", index, value);
+#endif
+	localVariables.long_int[index] = value;
+	*opCode = *opCode + 2;
+	return 0;
+}
+
+static int op_lsub(unsigned char **opCode, StackFrame *stack, \
+		SimpleConstantPool *p)
+{
+	long value2 = popLong(stack);
+	long value1 = popLong(stack);
+	long result = 0;
+	result = value1 - value2;
+#if SIMPLE_JVM_DEBUG
+	printf("lsub : %ld - %ld = %ld\n", value1, value2, result);
+#endif
+	pushLong(stack, result);
+	*opCode = *opCode + 1;
+	return 0;
+}
+
 static byteCode byteCodes[] = {
     { "aload_0"         , 0x2A, 1,  op_aload_0          },
     { "bipush"          , 0x10, 2,  op_bipush           },
@@ -684,7 +799,14 @@ static byteCode byteCodes[] = {
     { "new"             , 0xBB, 3,  op_new              },
     { "irem"            , 0x70, 1,  op_irem             },
     { "sipush"          , 0x11, 3,  op_sipush           },
-    { "return"          , 0xB1, 1,  op_return           }
+    { "return"          , 0xB1, 1,  op_return           },
+    { "if_icmpge"      , 0xA2, 3,  op_if_icmpge        },
+    { "goto"           , 0xA7, 3,  op_goto             },
+    { "l2i"            , 0x88, 1,  op_l2i              },
+    { "lload"          , 0x16, 2,  op_lload            },
+    { "lstore"         , 0x37, 2,  op_lstore           },
+    { "lsub"           , 0x65, 1,  op_lsub             },
+    { "iinc"           , 0x84, 3,  op_iinc             }
 };
 static size_t byteCode_size = sizeof(byteCodes) / sizeof(byteCode);
 

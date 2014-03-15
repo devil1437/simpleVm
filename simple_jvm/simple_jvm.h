@@ -327,6 +327,7 @@ int     is_ref_entry(StackFrame *stack);
 /* local variable */
 typedef struct _LocalVariables {
     int integer[10];
+    long long_int[10];
 } LocalVariables;
 
 /* byte Codes */

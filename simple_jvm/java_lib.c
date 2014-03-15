@@ -5,6 +5,9 @@
  */
 
 #include "java_lib.h"
+#include <sys/time.h>
+#include <stdio.h>
+#include <unistd.h>
 
 int java_lang_math_random(StackFrame *stack, SimpleConstantPool *p, char *type)
 {
@@ -21,8 +24,27 @@ int java_lang_math_random(StackFrame *stack, SimpleConstantPool *p, char *type)
     pushDouble(stack, r);
     return 0;
 }
+
+int java_lang_system_currenttimemillis(StackFrame *stack, SimpleConstantPool *p)
+{
+	struct timeval current_time;
+	gettimeofday(&current_time, NULL);
+
+	long secs = current_time.tv_sec;
+	long usecs = current_time.tv_usec;
+	long mtime = secs * 1000 + usecs / 1000;
+
+#if SIMPLE_JVM_DEBUG
+	printf("currentTimeMillis = %ld\n", mtime);
+#endif
+
+	pushLong(stack, mtime);
+	return 0;
+}
+
 static java_lang_method method_table[] = {
-    {"java/lang/Math", "random", java_lang_math_random}
+    {"java/lang/Math", "random", java_lang_math_random},
+    {"java/lang/System", "currentTimeMillis", java_lang_system_currenttimemillis}
 };
 
 static int java_lang_method_size = sizeof(method_table) / sizeof(java_lang_method);
@@ -50,3 +72,4 @@ int invoke_java_lang_library(StackFrame *stack, SimpleConstantPool *p,
     }
     return 0;
 }
+
