@@ -7,10 +7,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <gperftools/profiler.h>
 #include "simple_dvm.h"
 
 int main(int argc, char *argv[])
 {
+    ProfilerStart("prof.out");
+
     DexFileFormat dex;
     simple_dalvik_vm vm;
     int x = 0;
@@ -25,6 +28,8 @@ int main(int argc, char *argv[])
     parseDexFile(argv[1], &dex);
     if (is_verbose() > 3) printDexFile(&dex);
     simple_dvm_startup(&dex, &vm, "main");
+
+    ProfilerStop();
 
     return 0;
 }
